@@ -4,6 +4,7 @@ from pydantic import BaseModel
 import json
 import statistics
 import math
+import os
 
 app = FastAPI()
 
@@ -26,13 +27,30 @@ def p95(values):
 
 @app.post("/")
 def analyze(data: AnalyticsRequest):
-    with open("q-vercel-latency.json") as f:
+    base_dir = os.path.dirname(os.path.dirname(__file__))
+    data_path = os.path.join(base_dir, "q-vercel-latency.json")
+
+    with open(data_path) as f:
         records = json.load(f)
 
     result = {}
 
     for region in data.regions:
-        region_data = [r for r in records if r["region"] == region]
+        region_lower = region.lower()
+
+        region_data = [
+            r for r in records
+            if r["region"].lower() == region_lower
+        ]
+
+        if not region_data:
+            result[region] = {
+                "avg_latency": None,
+                "p95_latency": None,
+                "avg_uptime": None,
+                "breaches": 0
+            }
+            continue
 
         latencies = [r["latency_ms"] for r in region_data]
         uptimes = [r["uptime"] for r in region_data]
